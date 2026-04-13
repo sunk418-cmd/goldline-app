@@ -93,24 +93,28 @@ function AppContent() {
     const unsubNotices = onSnapshot(query(collection(db, 'notices'), orderBy('createdAt', 'desc')), (snapshot) => {
       setNotices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notice)));
     }, (error) => {
+      showToast('error', '공지사항 동기화 실패');
       handleFirestoreError(error, OperationType.GET, 'notices');
     });
 
     const unsubMeetings = onSnapshot(query(collection(db, 'meetings'), orderBy('createdAt', 'desc')), (snapshot) => {
       setMeetings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Meeting)));
     }, (error) => {
+      showToast('error', '회의록 동기화 실패');
       handleFirestoreError(error, OperationType.GET, 'meetings');
     });
 
     const unsubDrawings = onSnapshot(query(collection(db, 'drawings'), orderBy('createdAt', 'desc')), (snapshot) => {
       setDrawings(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Drawing)));
     }, (error) => {
+      showToast('error', '도면 동기화 실패');
       handleFirestoreError(error, OperationType.GET, 'drawings');
     });
 
     const unsubResources = onSnapshot(query(collection(db, 'resources'), orderBy('createdAt', 'desc')), (snapshot) => {
       setResources(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Resource)));
     }, (error) => {
+      showToast('error', '자료실 동기화 실패');
       handleFirestoreError(error, OperationType.GET, 'resources');
     });
 

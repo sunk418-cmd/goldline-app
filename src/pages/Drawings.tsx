@@ -192,16 +192,13 @@ export default function Drawings({ drawings, role, onDelete, isLoading, showToas
       // 2. Create drawing record in Firestore
       console.log("Creating Firestore record...");
       try {
-        const drawingData = {
-          title: newDrawing.title,
-          category: newDrawing.category,
-          imageUrl,
-          fileType: selectedFile.type === 'application/pdf' ? 'pdf' : 'image',
-          fileSize: selectedFile.size,
-          createdAt: serverTimestamp()
-        };
-        
-        await addDoc(collection(db, 'drawings'), drawingData);
+        // Use Promise.race for Firestore addDoc with 15s timeout
+        const addDocPromise = addDoc(collection(db, 'drawings'), drawingData);
+        const dbTimeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('DATABASE_TIMEOUT')), 15000)
+        );
+
+        await Promise.race([addDocPromise, dbTimeoutPromise]);
         console.log("Firestore record created successfully");
       } catch (firestoreError) {
         console.error("Firestore creation error:", firestoreError);
@@ -227,6 +224,8 @@ export default function Drawings({ drawings, role, onDelete, isLoading, showToas
         errorMsg = `오류: ${error.message}`;
       }
       showToast('error', errorMsg);
+      // Close modal on error to prevent UI hang
+      setIsCreateModalOpen(false);
     } finally {
       setIsUploading(false);
       console.log("Upload process finished");

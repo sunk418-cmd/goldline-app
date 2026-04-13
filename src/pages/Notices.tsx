@@ -52,14 +52,24 @@ export default function Notices({ notices, role, onCreate, onUpdate, onDelete, i
     n.author.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const [isUploading, setIsUploading] = useState(false);
+
   const handleCreate = async () => {
     if (!newNotice.title || !newNotice.content) return;
-    await onCreate({
-      ...newNotice,
-      authorEmail: 'admin@example.com' // In real app, get from auth
-    });
-    setIsCreateModalOpen(false);
-    setNewNotice({ title: '', content: '', author: '관리자' });
+    setIsUploading(true);
+    try {
+      await onCreate({
+        ...newNotice,
+        authorEmail: 'admin@example.com' // In real app, get from auth
+      });
+      setIsCreateModalOpen(false);
+      setNewNotice({ title: '', content: '', author: '관리자' });
+    } catch (error) {
+      console.error("Error creating notice:", error);
+      setIsCreateModalOpen(false);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const confirmDelete = async () => {
@@ -202,8 +212,15 @@ export default function Notices({ notices, role, onCreate, onUpdate, onDelete, i
         size="lg"
         footer={
           <>
-            <Button variant="outline" onClick={() => setIsCreateModalOpen(false)}>취소</Button>
-            <Button onClick={handleCreate} variant="primary" className="bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200/50">공지 등록</Button>
+            <Button variant="outline" onClick={() => setIsCreateModalOpen(false)} disabled={isUploading}>취소</Button>
+            <Button 
+              onClick={handleCreate} 
+              variant="primary" 
+              className="bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200/50"
+              disabled={isUploading || !newNotice.title || !newNotice.content}
+            >
+              {isUploading ? '등록 중...' : '공지 등록'}
+            </Button>
           </>
         }
       >

@@ -29,7 +29,8 @@ const firebaseConfig = {
   projectId: "ai-studio-applet-webapp-de8ea",
   storageBucket: "ai-studio-applet-webapp-de8ea.firebasestorage.app",
   messagingSenderId: "794412096508",
-  appId: "1:794412096508:web:045e71dfbba16481073079"
+  appId: "1:794412096508:web:045e71dfbba16481073079",
+  firestoreDatabaseId: "ai-studio-48ffc81f-ab8d-485c-832c-1e4b4af66d00"
 };
 
 // Initialize Firebase SDK

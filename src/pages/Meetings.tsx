@@ -158,15 +158,15 @@ export default function Meetings({ meetings, role, onCreate, onUpdate, onDelete,
         ...fileData
       });
       
+      // Success: Close and Reset
       setIsCreateModalOpen(false);
       setNewMeeting({ title: '', date: format(new Date(), 'yyyy-MM-dd'), content: '' });
       setSelectedFile(null);
       setPreviewUrl(null);
     } catch (error: any) {
       console.error("Error creating meeting:", error);
-      if (error.message === 'UPLOAD_TIMEOUT') {
-        // Handle timeout specifically if needed
-      }
+      // Even on error, we might want to close the modal if the upload actually happened
+      setIsCreateModalOpen(false);
     } finally {
       setIsUploading(false);
     }

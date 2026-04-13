@@ -160,7 +160,12 @@ export default function Resources({ resources, role, onDelete, isLoading, showTo
           createdAt: serverTimestamp()
         };
         
-        await addDoc(collection(db, 'resources'), resourceData);
+        const addDocPromise = addDoc(collection(db, 'resources'), resourceData);
+        const dbTimeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('DATABASE_TIMEOUT')), 15000)
+        );
+
+        await Promise.race([addDocPromise, dbTimeoutPromise]);
         console.log("Firestore record created successfully");
       } catch (firestoreError) {
         console.error("Firestore creation error:", firestoreError);
@@ -186,6 +191,8 @@ export default function Resources({ resources, role, onDelete, isLoading, showTo
         errorMsg = `오류: ${error.message}`;
       }
       showToast('error', errorMsg);
+      // Close modal on error
+      setIsCreateModalOpen(false);
     } finally {
       setIsUploading(false);
       console.log("Upload process finished");
