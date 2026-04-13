@@ -24,6 +24,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
+import { Document, Page } from 'react-pdf';
 
 import PdfPreview from '@/src/components/ui/PdfPreview';
 import Card from '@/src/components/ui/Card';
@@ -80,6 +81,13 @@ export default function Drawings({ drawings, role, onDelete, isLoading, showToas
   });
 
   const [drawingToDelete, setDrawingToDelete] = useState<string | null>(null);
+  const [numPages, setNumPages] = useState<number | null>(null);
+  const [pageNumber, setPageNumber] = useState(1);
+  const [useFallback, setUseFallback] = useState(false);
+
+  function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
+    setNumPages(numPages);
+  }
 
   const filteredDrawings = drawings.filter(d => {
     const matchesSearch = d.title.toLowerCase().includes(searchQuery.toLowerCase());
@@ -125,6 +133,14 @@ export default function Drawings({ drawings, role, onDelete, isLoading, showToas
       }
     };
   }, [previewUrl]);
+
+  useEffect(() => {
+    if (!isPreviewModalOpen) {
+      setPageNumber(1);
+      setNumPages(null);
+      setUseFallback(false);
+    }
+  }, [isPreviewModalOpen]);
 
   const handleCreate = async () => {
     if (!newDrawing.title) {
@@ -557,11 +573,62 @@ export default function Drawings({ drawings, role, onDelete, isLoading, showToas
             
             <div className="flex-1 bg-slate-900 rounded-[40px] overflow-hidden relative group flex flex-col items-center justify-center shadow-2xl">
               {selectedDrawing.fileType === 'pdf' ? (
-                <iframe
-                  src={`${selectedDrawing.imageUrl}#view=FitH`}
-                  className="w-full h-full border-none bg-white rounded-xl"
-                  title={selectedDrawing.title}
-                />
+                useFallback ? (
+                  <iframe
+                    src={`${selectedDrawing.imageUrl}#view=FitH`}
+                    className="w-full h-full border-none bg-white rounded-xl"
+                    title={selectedDrawing.title}
+                  />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center bg-slate-800 p-4 overflow-auto custom-scrollbar">
+                    <div className="flex-1 flex items-center justify-center min-h-0 w-full">
+                      <Document
+                        file={selectedDrawing.imageUrl}
+                        onLoadSuccess={onDocumentLoadSuccess}
+                        onLoadError={(err) => {
+                          console.error('PDF Load Error:', err);
+                          setUseFallback(true);
+                        }}
+                        loading={
+                          <div className="flex flex-col items-center gap-4 text-white">
+                            <Loader2 className="w-10 h-10 animate-spin text-violet-400" />
+                            <p className="text-xs font-black uppercase tracking-widest opacity-50">도면을 불러오는 중...</p>
+                          </div>
+                        }
+                      >
+                        <Page 
+                          pageNumber={pageNumber} 
+                          renderTextLayer={false}
+                          renderAnnotationLayer={false}
+                          className="shadow-2xl max-w-full"
+                          width={Math.min(window.innerWidth * 0.9, 1200)}
+                        />
+                      </Document>
+                    </div>
+                    
+                    {numPages && numPages > 1 && (
+                      <div className="mt-6 px-6 py-3 bg-black/40 backdrop-blur-xl rounded-2xl border border-white/10 flex items-center gap-6 text-white shrink-0">
+                        <button 
+                          onClick={() => setPageNumber(prev => Math.max(prev - 1, 1))}
+                          disabled={pageNumber <= 1}
+                          className="p-2 hover:bg-white/10 rounded-lg transition-colors disabled:opacity-20"
+                        >
+                          <ChevronLeft className="w-5 h-5" />
+                        </button>
+                        <span className="text-[10px] font-black uppercase tracking-widest min-w-[80px] text-center">
+                          {pageNumber} / {numPages}
+                        </span>
+                        <button 
+                          onClick={() => setPageNumber(prev => Math.min(prev + 1, numPages))}
+                          disabled={pageNumber >= numPages}
+                          className="p-2 hover:bg-white/10 rounded-lg transition-colors disabled:opacity-20"
+                        >
+                          <ChevronRight className="w-5 h-5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )
               ) : (
                 <TransformWrapper
                   initialScale={1}

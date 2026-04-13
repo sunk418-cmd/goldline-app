@@ -1,5 +1,9 @@
-import React, { useState } from 'react';
-import { FileText } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { FileText, Loader2 } from 'lucide-react';
+import { Document, Page, pdfjs } from 'react-pdf';
+
+// Set up the worker for PDF.js - using a CDN is more reliable across environments
+pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 interface PdfPreviewProps {
   imageUrl: string;
@@ -7,38 +11,70 @@ interface PdfPreviewProps {
 
 export default function PdfPreview({ imageUrl }: PdfPreviewProps) {
   const [isLoaded, setIsLoaded] = useState(false);
+  const [error, setError] = useState<boolean>(false);
+  const [useFallback, setUseFallback] = useState<boolean>(false);
 
-  // #page=1 ensures only the first page is shown
-  // toolbar=0, navpanes=0, scrollbar=0 hide the native PDF viewer controls
-  // view=FitH fits the page horizontally
-  const viewerUrl = `${imageUrl}#page=1&view=FitH&toolbar=0&navpanes=0&scrollbar=0&statusbar=0&messages=0`;
+  function onDocumentLoadSuccess() {
+    setIsLoaded(true);
+    setUseFallback(false);
+  }
+
+  function onDocumentLoadError(err: Error) {
+    console.error('PDF Load Error:', err);
+    setError(true);
+    setIsLoaded(true);
+    // If react-pdf fails (likely CORS), fallback to iframe for desktop
+    setUseFallback(true);
+  }
+
+  // Fallback UI for when react-pdf fails (e.g., CORS issues)
+  if (useFallback) {
+    return (
+      <div className="relative w-full h-full overflow-hidden bg-white flex items-center justify-center">
+        <iframe
+          src={`${imageUrl}#page=1&view=FitH&toolbar=0&navpanes=0&scrollbar=0&statusbar=0&messages=0`}
+          className="absolute inset-0 border-none w-full h-full pointer-events-none"
+          onLoad={() => setIsLoaded(true)}
+          title="PDF Thumbnail Fallback"
+        />
+        {!isLoaded && (
+          <div className="absolute inset-0 flex items-center justify-center bg-slate-50 z-0">
+            <Loader2 className="w-6 h-6 text-violet-500 animate-spin" />
+          </div>
+        )}
+        <div className="absolute inset-0 z-10 bg-transparent" />
+      </div>
+    );
+  }
 
   return (
-    <div className="relative w-full h-full overflow-hidden bg-white pointer-events-none flex items-center justify-center">
-      {/* Iframe acts as the image renderer. Native PDF viewers bypass CORS fetch restrictions. */}
-      {/* We apply a slight scale hack if we want it to cover completely, but typical FitH works well enough. */}
-      <iframe
-        src={viewerUrl}
-        className={`absolute inset-0 border-none transition-opacity duration-300 pointer-events-none custom-pdf-iframe`}
-        style={{ 
-          width: '100%', 
-          height: '100%', 
-          opacity: isLoaded ? 1 : 0 
-        }}
-        onLoad={() => setIsLoaded(true)}
-        title="PDF Thumbnail"
-        scrolling="no"
-        tabIndex={-1}
-      />
+    <div className="relative w-full h-full overflow-hidden bg-white flex items-center justify-center">
+      <div 
+        className={`transition-opacity duration-500 w-full h-full flex items-center justify-center ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
+      >
+        <Document
+          file={imageUrl}
+          onLoadSuccess={onDocumentLoadSuccess}
+          onLoadError={onDocumentLoadError}
+          loading={null}
+          className="flex items-center justify-center w-full h-full overflow-hidden"
+        >
+          <Page 
+            pageNumber={1} 
+            renderTextLayer={false} 
+            renderAnnotationLayer={false}
+            className="max-w-full max-h-full"
+            width={300}
+          />
+        </Document>
+      </div>
       
-      {/* Loading state / Default backdrop */}
       {!isLoaded && (
         <div className="absolute inset-0 flex items-center justify-center bg-slate-50 z-0">
-          <FileText className="w-6 h-6 text-slate-200 animate-pulse" />
+          <Loader2 className="w-6 h-6 text-violet-500 animate-spin" />
         </div>
       )}
 
-      {/* Transparent overlay blocks any accidental clicks and captures hover events */}
       <div className="absolute inset-0 z-10 bg-transparent" />
     </div>
   );
