@@ -8,7 +8,11 @@
 
 @layer base {
   body {
-    @apply font-sans text-slate-900 bg-slate-50/50 antialiased selection:bg-indigo-100 selection:text-indigo-900;
+    @apply font-sans text-slate-900 bg-slate-50/50 antialiased;
+  }
+
+  ::selection {
+    @apply bg-indigo-100 text-indigo-900;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -22,12 +26,13 @@
   }
 
   .sophisticated-shadow {
-    @apply shadow-[0_8px_30px_rgb(0,0,0,0.04)];
+    @apply shadow-[0_8px_30px_rgba(0,0,0,0.04)];
   }
 
   .no-scrollbar::-webkit-scrollbar {
     display: none;
   }
+
   .no-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;

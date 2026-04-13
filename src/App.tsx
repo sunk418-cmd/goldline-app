@@ -62,6 +62,21 @@ function AppContent() {
   const [allowedUsers, setAllowedUsers] = useState<AllowedUser[]>([]);
 
   useEffect(() => {
+    // Check for redirect result on mount
+    const checkRedirect = async () => {
+      try {
+        const { getRedirectResult } = await import('firebase/auth');
+        const result = await getRedirectResult(auth);
+        if (result) {
+          showToast('success', '리다이렉트 로그인이 완료되었습니다!');
+        }
+      } catch (error: any) {
+        console.error("Redirect summary error:", error);
+        setLoginError(`리다이렉트 로그인 실패: ${error.message}`);
+      }
+    };
+    checkRedirect();
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         // 1. Hardcoded emergency owner (Compare with lowercase)
@@ -185,8 +200,30 @@ function AppContent() {
       showToast('success', '로그인이 완료되었습니다!');
     } catch (error: any) {
       console.error("Login detail error:", error);
-      setLoginError(error.message);
-      showToast('error', `로그인 실패: ${error.code}`);
+      
+      let message = "로그인에 실패했습니다.";
+      if (error.code === 'auth/popup-blocked') {
+        message = "팝업이 차단되었습니다. 브라우저 설정을 확인해주세요.";
+      } else if (error.code === 'auth/internal-error' || error.message.includes('invalid-action-code')) {
+        message = "브라우저 설정에서 '3차 쿠키 차단'을 해제하거나 '리다이렉트 로그인'을 시도해주세요.";
+      } else {
+        message = `로그인 실패: ${error.code || error.message}`;
+      }
+      
+      setLoginError(message);
+      showToast('error', message);
+    }
+  };
+
+  const handleLoginRedirect = async () => {
+    setLoginError(null);
+    try {
+      showToast('info', 'Google 로그인 페이지로 이동합니다...');
+      await signInWithRedirect(auth, googleProvider);
+    } catch (error: any) {
+      console.error("Redirect Login error:", error);
+      setLoginError(`리다이렉트 로그인 실패: ${error.message}`);
+      showToast('error', '로그인 페이지 이동 실패');
     }
   };
 
@@ -212,7 +249,7 @@ function AppContent() {
   if (!user) {
     return (
       <>
-        <Login onLogin={handleLogin} error={loginError} />
+        <Login onLogin={handleLogin} onLoginRedirect={handleLoginRedirect} error={loginError} />
         <ToastContainer toasts={toasts} onClose={removeToast} />
       </>
     );

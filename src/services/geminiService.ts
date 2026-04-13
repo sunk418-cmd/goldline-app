@@ -4,10 +4,12 @@ const MODEL_NAME = "gemini-3-flash-preview";
 
 export async function askGemini(question: string, context: string | { trackMaintenanceReg: string, maintenanceGuide: string, trackInspectionReg: string }) {
   // Use VITE_GEMINI_API_KEY from environment variables for security
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  // Check both VITE_ and non-VITE just in case (though Vite typically needs VITE_)
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY;
   
   if (!apiKey) {
-    throw new Error("Gemini API key is missing. Please ensure VITE_GEMINI_API_KEY is defined in your .env file and restart the dev server.");
+    console.error("Gemini API key is missing. Check your environment variables.");
+    throw new Error("Gemini API 키가 설정되지 않았습니다. 배포 환경의 환경 변수(VITE_GEMINI_API_KEY)를 확인해 주세요.");
   }
   
   const ai = new GoogleGenAI({ apiKey });

@@ -46,6 +46,9 @@ export const db = (firebaseConfig.firestoreDatabaseId && firebaseConfig.firestor
 export const storage = getStorage(app, firebaseConfig.storageBucket || undefined);
 storage.maxOperationRetryTime = 10000; // 10 seconds max retry time
 export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({
+  prompt: 'select_account'
+});
 
 // Validation test
 async function testConnection() {

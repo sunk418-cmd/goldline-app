@@ -6,10 +6,11 @@ import { APP_NAME } from '@/src/constants';
 
 interface LoginProps {
   onLogin: () => Promise<void>;
+  onLoginRedirect: () => Promise<void>;
   error?: string | null;
 }
 
-export default function Login({ onLogin, error }: LoginProps) {
+export default function Login({ onLogin, onLoginRedirect, error }: LoginProps) {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async () => {
@@ -42,7 +43,8 @@ export default function Login({ onLogin, error }: LoginProps) {
           <div className="space-y-6">
             <div className="space-y-4">
               <p className="text-sm text-center text-gray-600">
-                보안을 위해 구글 계정으로 로그인해 주세요.
+                보안을 위해 구글 계정으로 로그인해 주세요.<br/>
+                <span className="text-xs text-gray-400">(브라우저의 '3차 쿠키 차단' 해제가 필요할 수 있습니다)</span>
               </p>
               
               {error && (
@@ -58,7 +60,20 @@ export default function Login({ onLogin, error }: LoginProps) {
                 className="w-full py-4 text-lg"
                 leftIcon={<LogIn className="w-5 h-5" />}
               >
-                Google 계정으로 로그인
+                Google 계정으로 로그인 (팝업)
+              </Button>
+
+              <div className="relative py-2">
+                <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-gray-100"></span></div>
+                <div className="relative flex justify-center text-xs uppercase"><span className="bg-white px-2 text-gray-400">또는</span></div>
+              </div>
+
+              <Button 
+                variant="outline"
+                onClick={onLoginRedirect}
+                className="w-full py-3 text-sm border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+              >
+                리다이렉트 방식으로 로그인
               </Button>
             </div>
 
