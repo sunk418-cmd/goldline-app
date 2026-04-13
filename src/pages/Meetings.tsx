@@ -7,7 +7,7 @@ import {
   MoreVertical, 
   Edit2, 
   Trash2, 
-  Eye,
+  Maximize2,
   Calendar,
   User,
   AlertCircle,
