@@ -64,17 +64,39 @@ function AppContent() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        // Simple profile creation without DB calls
-        const role: UserRole = (firebaseUser.email === 'sunk418@gmail.com' || firebaseUser.email === 'sunk4180@gmail.com') ? 'owner' : 'user';
+        // 1. Hardcoded emergency owner (Compare with lowercase)
+        const primaryOwner = 'sunk418@gmail.com';
+        const userEmail = (firebaseUser.email || '').toLowerCase();
+        const isOwner = userEmail === primaryOwner;
+        const role: UserRole = isOwner ? 'owner' : 'user';
         
         setUser({
           uid: firebaseUser.uid,
-          email: firebaseUser.email!,
+          email: userEmail,
           displayName: firebaseUser.displayName || '사용자',
           role: role,
           createdAt: new Date()
         });
-        setIsAllowed(true);
+
+        // 2. Initial check: owner is always allowed
+        if (isOwner) {
+          setIsAllowed(true);
+        } else {
+          // If not owner, check Firestore whitelist immediately
+          try {
+            const userDoc = await getDocFromServer(doc(db, 'allowedUsers', userEmail));
+            if (userDoc.exists()) {
+              setIsAllowed(true);
+              const data = userDoc.data() as AllowedUser;
+              setUser(prev => prev ? {...prev, role: data.role} : prev);
+            } else {
+              setIsAllowed(false);
+            }
+          } catch (e) {
+            console.error("Whitelist check error:", e);
+            setIsAllowed(false);
+          }
+        }
       } else {
         setUser(null);
         setIsAllowed(false);
@@ -119,7 +141,27 @@ function AppContent() {
     });
 
     const unsubAllowed = onSnapshot(collection(db, 'allowedUsers'), (snapshot) => {
-      setAllowedUsers(snapshot.docs.map(doc => doc.data() as AllowedUser));
+      const users = snapshot.docs.map(doc => doc.data() as AllowedUser);
+      setAllowedUsers(users);
+      
+      // Real-time permission check
+      if (user) {
+        const primaryOwner = 'sunk418@gmail.com';
+        const userEmail = user.email.toLowerCase();
+        const isInWhitelist = users.some(u => u.email.toLowerCase() === userEmail);
+        const isOwner = userEmail === primaryOwner;
+        
+        if (isOwner || isInWhitelist) {
+          setIsAllowed(true);
+          // If in whitelist, update role accordingly
+          if (isInWhitelist) {
+            const whiteListUser = users.find(u => u.email.toLowerCase() === userEmail);
+            if (whiteListUser) setUser(prev => prev ? {...prev, role: whiteListUser.role} : prev);
+          }
+        } else {
+          setIsAllowed(false);
+        }
+      }
     }, (error) => {
       handleFirestoreError(error, OperationType.GET, 'allowedUsers');
     });
