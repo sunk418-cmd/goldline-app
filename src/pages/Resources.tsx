@@ -200,6 +200,20 @@ export default function Resources({ resources, role, onDelete, isLoading, showTo
     }
   };
 
+  const handleViewResource = (fileUrl: string, fileName: string) => {
+    if (!fileUrl) return;
+    
+    const lowerName = fileName.toLowerCase();
+    // PDF and Images can be opened directly
+    if (lowerName.endsWith('.pdf') || /\.(jpg|jpeg|png|gif|webp)$/i.test(lowerName)) {
+      window.open(fileUrl, '_blank');
+    } else {
+      // For Office documents, use Google Docs Viewer to avoid forced download
+      const viewerUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(fileUrl)}&embedded=true`;
+      window.open(viewerUrl, '_blank');
+    }
+  };
+
   const getFileIcon = (type: string, className: string = "w-8 h-8") => {
     switch (type.toLowerCase()) {
       case 'pdf': return <FileText className={cn(className, "text-rose-500")} />;
@@ -289,10 +303,10 @@ export default function Resources({ resources, role, onDelete, isLoading, showTo
                 variant="primary" 
                 size="sm"
                 className="flex-1 bg-amber-600 hover:bg-amber-700 shadow-xl shadow-amber-200/50 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest"
-                leftIcon={<Download className="w-3.5 h-3.5" />}
-                onClick={() => window.open(resource.fileUrl, '_blank')}
+                leftIcon={<Maximize2 className="w-3.5 h-3.5" />}
+                onClick={() => handleViewResource(resource.fileUrl, resource.fileName || resource.title)}
               >
-                Download
+                자료 크게 보기
               </Button>
               {(role === 'owner' || role === 'admin') && (
                 <Button 

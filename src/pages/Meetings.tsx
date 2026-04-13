@@ -573,10 +573,10 @@ export default function Meetings({ meetings, role, onCreate, onUpdate, onDelete,
                       onClick={() => handleViewFile(selectedMeeting.fileUrl!, selectedMeeting.fileName || 'file')}
                       variant="outline"
                       size="sm"
-                      leftIcon={<Eye className="w-4 h-4" />}
+                      leftIcon={<Maximize2 className="w-4 h-4" />}
                       className="w-full sm:w-auto bg-white border-slate-200 text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 text-[11px] font-black"
                     >
-                      파일 보기
+                      원본 크게 보기
                     </Button>
                   </div>
                 </div>

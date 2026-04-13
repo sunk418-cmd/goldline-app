@@ -241,29 +241,10 @@ export default function Drawings({ drawings, role, onDelete, isLoading, showToas
     }
   };
 
-  const handleDownload = async () => {
+  const handleOpenOriginal = () => {
     if (!selectedDrawing) return;
-    try {
-      // Try fetching to download as a blob (better for naming the file)
-      const response = await fetch(selectedDrawing.imageUrl);
-      if (!response.ok) throw new Error('Network response was not ok');
-      
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${selectedDrawing.title}.${selectedDrawing.fileType === 'pdf' ? 'pdf' : 'jpg'}`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      showToast('success', '도면 다운로드가 시작되었습니다.');
-    } catch (error) {
-      console.warn("Fetch download failed, falling back to window.open:", error);
-      // Fallback: just open the URL in a new tab
-      window.open(selectedDrawing.imageUrl, '_blank');
-      showToast('info', '새 창에서 도면 다운로드를 시도합니다.');
-    }
+    window.open(selectedDrawing.imageUrl, '_blank');
+    showToast('info', '새 창에서 원본 도면을 엽니다.');
   };
 
   return (
@@ -563,11 +544,11 @@ export default function Drawings({ drawings, role, onDelete, isLoading, showToas
               <Button 
                 variant="primary" 
                 size="md" 
-                leftIcon={<Download className="w-4 h-4" />}
+                leftIcon={<Maximize2 className="w-4 h-4" />}
                 className="w-full md:w-auto bg-violet-600 hover:bg-violet-700 shadow-xl shadow-violet-200/50 py-4 md:py-3 px-8 whitespace-nowrap text-[10px] uppercase tracking-widest font-black"
-                onClick={handleDownload}
+                onClick={handleOpenOriginal}
               >
-                도면 다운로드
+                도면 크게 보기
               </Button>
             </div>
             
