@@ -3,10 +3,14 @@ import { GoogleGenAI } from "@google/genai";
 const MODEL_NAME = "gemini-3-flash-preview";
 
 export async function askGemini(question: string, context: string | { trackMaintenanceReg: string, maintenanceGuide: string, trackInspectionReg: string }) {
-  // Use your new API key
-  const apiKey = "AIzaSyAe_l92Zi4YWPcawuIWcNWLHYmsdywrYuo";
+  // Use VITE_GEMINI_API_KEY from environment variables for security
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
   
-  const ai = new GoogleGenAI({ apiKey });
+  if (!apiKey) {
+    throw new Error("Gemini API key is missing. Please add VITE_GEMINI_API_KEY to your .env file.");
+  }
+  
+  const ai = new GoogleGenAI(apiKey);
   
   const contentText = typeof context === 'string' ? context : 
     `${context.trackMaintenanceReg}\n${context.maintenanceGuide}\n${context.trackInspectionReg}`;
