@@ -1,0 +1,78 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Owner (운영자) - Fixed to sunk418@gmail.com and sunk4180@gmail.com
+    function isOwner() {
+      return isAuthenticated() && 
+             (request.auth.token.email == 'sunk418@gmail.com' || request.auth.token.email == 'sunk4180@gmail.com') && 
+             request.auth.token.email_verified == true;
+    }
+    
+    // Manager (관리자) - Added by Owner
+    function isAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/allowedUsers/$(request.auth.token.email)).data.role == 'admin' || isOwner());
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    // User profiles
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      // Users can update their own profile on login, Managers can do anything
+      allow write: if isAdmin() || (isAuthenticated() && request.auth.uid == userId);
+    }
+
+    // Content collections: Notices, Meetings, Drawings, Resources
+    // General users can read (view/download), only Managers (Admin/Owner) can write
+    match /test/connection {
+      allow read: if true;
+    }
+    
+    match /notices/{id} { 
+      allow read: if isAuthenticated(); 
+      allow write: if isAdmin(); 
+    }
+    match /meetings/{id} { 
+      allow read: if isAuthenticated(); 
+      allow write: if isAdmin(); 
+    }
+    match /drawings/{id} { 
+      allow read: if isAuthenticated(); 
+      allow write: if isAdmin(); 
+    }
+    match /resources/{id} { 
+      allow read: if isAuthenticated(); 
+      allow write: if isAdmin(); 
+    }
+
+    // Whitelist of allowed users
+    match /allowedUsers/{email} {
+      allow read: if isAuthenticated();
+      
+      // Owner can add/remove anyone
+      // Admin can only add/remove 'user' role
+      allow create, update: if isOwner() || 
+        (isAdmin() && request.resource.data.role == 'user');
+        
+      allow delete: if isOwner() || 
+        (isAdmin() && resource.data.role == 'user');
+    }
+    
+    // Default deny for any other collections
+    match /{document=**} {
+      allow read, write: if isAdmin();
+    }
+  }
+}

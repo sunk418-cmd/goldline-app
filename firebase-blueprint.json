@@ -1,0 +1,91 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "사용자 프로필 정보",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "user"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "AllowedUser": {
+      "title": "AllowedUser",
+      "description": "접근 허용된 사용자 목록",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["admin", "user"] }
+      },
+      "required": ["email", "role"]
+    },
+    "Notice": {
+      "title": "Notice",
+      "description": "공지사항",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "author": { "type": "string" },
+        "authorEmail": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "content", "author", "authorEmail"]
+    },
+    "Meeting": {
+      "title": "Meeting",
+      "description": "회의록",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "date": { "type": "string" },
+        "content": { "type": "string" },
+        "fileUrl": { "type": "string" },
+        "fileName": { "type": "string" },
+        "fileType": { "type": "string" },
+        "fileSize": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "date", "content"]
+    },
+    "Drawing": {
+      "title": "Drawing",
+      "description": "도면",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "category": { "type": "string", "enum": ["분기기 도면", "기타 도면"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "imageUrl", "category"]
+    },
+    "Resource": {
+      "title": "Resource",
+      "description": "자료실 파일",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "fileUrl": { "type": "string" },
+        "fileName": { "type": "string" },
+        "fileType": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "fileUrl", "fileName", "fileType"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": { "schema": { "$ref": "#/entities/UserProfile" }, "description": "사용자 프로필" },
+    "/allowedUsers/{email}": { "schema": { "$ref": "#/entities/AllowedUser" }, "description": "허용된 사용자" },
+    "/notices/{noticeId}": { "schema": { "$ref": "#/entities/Notice" }, "description": "공지사항" },
+    "/meetings/{meetingId}": { "schema": { "$ref": "#/entities/Meeting" }, "description": "회의록" },
+    "/drawings/{drawingId}": { "schema": { "$ref": "#/entities/Drawing" }, "description": "도면" },
+    "/resources/{resourceId}": { "schema": { "$ref": "#/entities/Resource" }, "description": "자료실" },
+    "/test/connection": { "schema": "object", "description": "연결 테스트용 경로" }
+  }
+}
