@@ -63,61 +63,18 @@ function AppContent() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      console.log("onAuthStateChanged triggered:", firebaseUser?.email, firebaseUser?.uid);
       if (firebaseUser) {
-        try {
-          console.log("Checking allowedUsers for:", firebaseUser.email);
-          // Check if user is in allowedUsers collection
-          const allowedDoc = await getDoc(doc(db, 'allowedUsers', firebaseUser.email!));
-          console.log("allowedDoc exists:", allowedDoc.exists());
-          
-          if (allowedDoc.exists() || firebaseUser.email === 'sunk418@gmail.com' || firebaseUser.email === 'sunk4180@gmail.com') {
-            let role: UserRole = 'user';
-            
-            if (firebaseUser.email === 'sunk418@gmail.com' || firebaseUser.email === 'sunk4180@gmail.com') {
-              role = 'owner';
-            } else if (allowedDoc.exists()) {
-              role = allowedDoc.data().role as UserRole;
-            }
-            
-            const userProfile: UserProfile = {
-              uid: firebaseUser.uid,
-              email: firebaseUser.email!,
-              displayName: firebaseUser.displayName || '사용자',
-              photoURL: firebaseUser.photoURL || undefined,
-              role: role,
-              createdAt: new Date()
-            };
-
-            // Save/Update user profile in Firestore
-            try {
-              await setDoc(doc(db, 'users', firebaseUser.uid), {
-                ...userProfile,
-                updatedAt: serverTimestamp()
-              }, { merge: true });
-            } catch (writeError) {
-              handleFirestoreError(writeError, OperationType.WRITE, `users/${firebaseUser.uid}`);
-            }
-
-            setUser(userProfile);
-            setIsAllowed(true);
-          } else {
-            setIsAllowed(false);
-            await signOut(auth);
-            showToast('error', '허가되지 않은 사용자입니다. 관리자에게 문의하세요.');
-          }
-        } catch (error) {
-          console.error("Auth check error:", error);
-          // If it's already a Firestore error thrown by handleFirestoreError, just rethrow it
-          if (error instanceof Error && error.message.includes('operationType')) {
-            throw error;
-          }
-          // Otherwise, wrap it if it's a permission error
-          if (error instanceof Error && error.message.includes('permission')) {
-            handleFirestoreError(error, OperationType.GET, `allowedUsers/${firebaseUser.email}`);
-          }
-          setIsAllowed(false);
-        }
+        // Simple profile creation without DB calls
+        const role: UserRole = (firebaseUser.email === 'sunk418@gmail.com' || firebaseUser.email === 'sunk4180@gmail.com') ? 'owner' : 'user';
+        
+        setUser({
+          uid: firebaseUser.uid,
+          email: firebaseUser.email!,
+          displayName: firebaseUser.displayName || '사용자',
+          role: role,
+          createdAt: new Date()
+        });
+        setIsAllowed(true);
       } else {
         setUser(null);
         setIsAllowed(false);
@@ -172,25 +129,18 @@ function AppContent() {
     };
   }, [user, isAllowed]);
 
+  const [loginError, setLoginError] = useState<string | null>(null);
+
   const handleLogin = async () => {
+    setLoginError(null);
     try {
+      showToast('info', 'Google 로그인 창을 여는 중...');
       await signInWithPopup(auth, googleProvider);
-      showToast('success', '로그인 중입니다...');
+      showToast('success', '로그인이 완료되었습니다!');
     } catch (error: any) {
-      // Don't show error toast if user just closed the popup
-      if (error.code === 'auth/popup-closed-by-user') {
-        console.log("Login cancelled by user (popup closed)");
-        return;
-      }
-      console.error("Popup login failed, trying redirect:", error);
-      showToast('info', '팝업 로그인이 차단되어 리다이렉트 로그인으로 전환합니다...');
-      
-      try {
-        await signInWithRedirect(auth, googleProvider);
-      } catch (redirectError: any) {
-        console.error("Redirect login error:", redirectError);
-        showToast('error', `로그인에 실패했습니다: ${redirectError.message}`);
-      }
+      console.error("Login detail error:", error);
+      setLoginError(error.message);
+      showToast('error', `로그인 실패: ${error.code}`);
     }
   };
 
@@ -216,7 +166,7 @@ function AppContent() {
   if (!user) {
     return (
       <>
-        <Login onLogin={handleLogin} />
+        <Login onLogin={handleLogin} error={loginError} />
         <ToastContainer toasts={toasts} onClose={removeToast} />
       </>
     );

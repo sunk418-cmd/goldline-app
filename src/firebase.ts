@@ -22,15 +22,14 @@ import {
 import { getStorage, ref, uploadBytes, getDownloadURL, uploadBytesResumable, getBlob } from 'firebase/storage';
 
 // Firebase configuration from environment variables
+// Firebase configuration - Using hardcoded values for absolute reliability
 const firebaseConfig = {
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  firestoreDatabaseId: import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || ""
+  apiKey: "AIzaSyB_z4K-XS5qEXyqxQ5nEeeT715rERTvnOg",
+  authDomain: "ai-studio-applet-webapp-de8ea.web.app",
+  projectId: "ai-studio-applet-webapp-de8ea",
+  storageBucket: "ai-studio-applet-webapp-de8ea.firebasestorage.app",
+  messagingSenderId: "794412096508",
+  appId: "1:794412096508:web:045e71dfbba16481073079"
 };
 
 // Initialize Firebase SDK
