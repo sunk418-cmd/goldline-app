@@ -5,6 +5,8 @@ import { UserProfile } from '@/src/types';
 
 interface HeaderProps {
   onMenuClick: () => void;
+}
+
 export default function Header({ onMenuClick }: HeaderProps) {
   return (
     <header className="sticky top-0 z-30 w-full bg-white/70 backdrop-blur-xl border-b border-slate-200/50 h-20 flex items-center px-6 lg:px-10 justify-between">
