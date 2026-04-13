@@ -36,8 +36,14 @@ const firebaseConfig = {
 // Initialize Firebase SDK
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-export const storage = getStorage(app, firebaseConfig.storageBucket);
+
+// Initialize Firestore - default to (default) if no ID is provided
+export const db = (firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== "(default)") 
+  ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
+  : getFirestore(app);
+
+// Initialize Storage - ensure storageBucket is used correctly
+export const storage = getStorage(app, firebaseConfig.storageBucket || undefined);
 storage.maxOperationRetryTime = 10000; // 10 seconds max retry time
 export const googleProvider = new GoogleAuthProvider();
 
