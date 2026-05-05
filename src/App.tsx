@@ -7,10 +7,11 @@ import Meetings from './pages/Meetings';
 import Drawings from './pages/Drawings';
 import Resources from './pages/Resources';
 import Regulations from './pages/Regulations';
+import SafetyDocs from './pages/SafetyDocs';
 import Admin from './pages/Admin';
 import Login from './pages/Login';
 import Unauthorized from './pages/Unauthorized';
-import { ROUTES } from './constants';
+import { ROUTES, OPERATOR_EMAILS } from './constants';
 import { UserProfile, Notice, Meeting, Drawing, Resource, AllowedUser, UserRole } from './types';
 import { ToastContainer } from './components/ui/Toast';
 import ErrorBoundary from './components/ui/ErrorBoundary';
@@ -79,11 +80,10 @@ function AppContent() {
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        // 1. Hardcoded emergency owner (Compare with lowercase)
-        const primaryOwner = 'sunk418@gmail.com';
+        // 1. Check if user is an operator using centralized list
         const userEmail = (firebaseUser.email || '').toLowerCase();
-        const isOwner = userEmail === primaryOwner;
-        const role: UserRole = isOwner ? 'owner' : 'user';
+        const isOperator = OPERATOR_EMAILS.includes(userEmail);
+        const role: UserRole = isOperator ? 'owner' : 'user';
         
         setUser({
           uid: firebaseUser.uid,
@@ -93,8 +93,8 @@ function AppContent() {
           createdAt: new Date()
         });
 
-        // 2. Initial check: owner is always allowed
-        if (isOwner) {
+        // 2. Initial check: operator is always allowed
+        if (isOperator) {
           setIsAllowed(true);
         } else {
           // If not owner, check Firestore whitelist immediately
@@ -103,7 +103,9 @@ function AppContent() {
             if (userDoc.exists()) {
               setIsAllowed(true);
               const data = userDoc.data() as AllowedUser;
-              setUser(prev => prev ? {...prev, role: data.role} : prev);
+              const isOperator = OPERATOR_EMAILS.includes(userEmail);
+              const finalRole = isOperator ? 'owner' : data.role;
+              setUser(prev => prev ? {...prev, role: finalRole} : prev);
             } else {
               setIsAllowed(false);
             }
@@ -161,17 +163,19 @@ function AppContent() {
       
       // Real-time permission check
       if (user) {
-        const primaryOwner = 'sunk418@gmail.com';
         const userEmail = user.email.toLowerCase();
         const isInWhitelist = users.some(u => u.email.toLowerCase() === userEmail);
-        const isOwner = userEmail === primaryOwner;
+        const isOperator = OPERATOR_EMAILS.includes(userEmail);
         
-        if (isOwner || isInWhitelist) {
+        if (isOperator || isInWhitelist) {
           setIsAllowed(true);
           // If in whitelist, update role accordingly
           if (isInWhitelist) {
             const whiteListUser = users.find(u => u.email.toLowerCase() === userEmail);
-            if (whiteListUser) setUser(prev => prev ? {...prev, role: whiteListUser.role} : prev);
+            if (whiteListUser) {
+              const finalRole = isOperator ? 'owner' : whiteListUser.role;
+              setUser(prev => prev ? {...prev, role: finalRole} : prev);
+            }
           }
         } else {
           setIsAllowed(false);
@@ -274,6 +278,7 @@ function AppContent() {
           <Route path={ROUTES.DRAWINGS} element={<Drawings drawings={drawings} role={user.role} onDelete={async (id) => { try { await deleteDoc(doc(db, 'drawings', id)); showToast('success', '도면이 삭제되었습니다.'); } catch (e) { handleFirestoreError(e, OperationType.DELETE, `drawings/${id}`); } }} isLoading={isLoading} showToast={showToast} />} />
           <Route path={ROUTES.RESOURCES} element={<Resources resources={resources} role={user.role} onDelete={async (id) => { try { await deleteDoc(doc(db, 'resources', id)); showToast('success', '자료가 삭제되었습니다.'); } catch (e) { handleFirestoreError(e, OperationType.DELETE, `resources/${id}`); } }} isLoading={isLoading} showToast={showToast} />} />
           <Route path={ROUTES.REGULATIONS} element={<Regulations />} />
+          <Route path={ROUTES.SAFETY_DOCS} element={<SafetyDocs />} />
           <Route path={ROUTES.ADMIN} element={(user.role === 'owner' || user.role === 'admin') ? <Admin userRole={user.role} allowedUsers={allowedUsers} drawings={drawings} resources={resources} notices={notices} meetings={meetings} onAddAllowedUser={async (e, r) => { try { await setDoc(doc(db, 'allowedUsers', e), { email: e, role: r }); showToast('success', '사용자가 추가되었습니다.'); } catch (err) { handleFirestoreError(err, OperationType.WRITE, `allowedUsers/${e}`); } }} onRemoveAllowedUser={async (e) => { try { await deleteDoc(doc(db, 'allowedUsers', e)); showToast('success', '사용자가 삭제되었습니다.'); } catch (err) { handleFirestoreError(err, OperationType.DELETE, `allowedUsers/${e}`); } }} isLoading={isLoading} /> : <Navigate to={ROUTES.DASHBOARD} />} />
           <Route path="*" element={<Navigate to={ROUTES.DASHBOARD} />} />
         </Routes>

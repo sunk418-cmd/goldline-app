@@ -10,7 +10,8 @@ import {
   TrendingUp,
   Users,
   Calendar,
-  Settings
+  Settings,
+  Shield
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import Card from '@/src/components/ui/Card';
@@ -79,7 +80,7 @@ export default function Dashboard({ notices, meetings, drawings, resources, isLo
       </div>
 
       {/* Quick Access - Middle Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Link to={ROUTES.REGULATIONS} className="flex items-center gap-3 p-4 rounded-2xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-all duration-300 group border border-indigo-100/50">
           <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
             <Search className="w-5 h-5" />
@@ -103,6 +104,12 @@ export default function Dashboard({ notices, meetings, drawings, resources, isLo
             <FolderOpen className="w-5 h-5" />
           </div>
           <span className="text-xs font-black uppercase tracking-widest">자료실</span>
+        </Link>
+        <Link to={ROUTES.SAFETY_DOCS} className="flex items-center gap-3 p-4 rounded-2xl bg-orange-50 text-orange-700 hover:bg-orange-100 transition-all duration-300 group border border-orange-100/50">
+          <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
+            <Shield className="w-5 h-5" />
+          </div>
+          <span className="text-xs font-black uppercase tracking-widest">안전서류 생성</span>
         </Link>
       </div>
 

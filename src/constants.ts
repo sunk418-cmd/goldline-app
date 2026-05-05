@@ -1,5 +1,8 @@
 export const APP_NAME = "김포골드라인 토목팀 앱";
 
+export const OPERATOR_EMAILS = ['sunk418@gmail.com', 'sunk4180@gmail.com'];
+
+
 export const DRAWING_CATEGORIES = [
   '분기기 도면',
   '선로일람약도',
@@ -16,5 +19,6 @@ export const ROUTES = {
   REGULATIONS: '/regulations',
   ADMIN: '/admin',
   LOGIN: '/login',
-  UNAUTHORIZED: '/unauthorized'
+  UNAUTHORIZED: '/unauthorized',
+  SAFETY_DOCS: '/safety-docs'
 } as const;

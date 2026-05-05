@@ -191,6 +191,15 @@ export default function Drawings({ drawings, role, onDelete, isLoading, showToas
       
       // 2. Create drawing record in Firestore
       console.log("Creating Firestore record...");
+      
+      const drawingData = {
+        title: newDrawing.title,
+        category: newDrawing.category,
+        imageUrl: imageUrl,
+        fileType: newDrawing.fileType,
+        createdAt: serverTimestamp(),
+      };
+
       try {
         // Use Promise.race for Firestore addDoc with 15s timeout
         const addDocPromise = addDoc(collection(db, 'drawings'), drawingData);

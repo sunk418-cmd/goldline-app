@@ -20,6 +20,7 @@ import Input from '@/src/components/ui/Input';
 import Badge from '@/src/components/ui/Badge';
 import Modal from '@/src/components/ui/Modal';
 import { AllowedUser, UserRole, Drawing, Resource, Notice, Meeting } from '@/src/types';
+import { OPERATOR_EMAILS } from '@/src/constants';
 
 interface AdminProps {
   userRole: UserRole;
@@ -86,14 +87,47 @@ export default function Admin({ userRole, allowedUsers, drawings, resources, not
           <h1 className="text-3xl font-black text-slate-900 tracking-tighter">시스템 관리</h1>
           <p className="text-slate-500 mt-1 font-medium text-base">사용자 권한 및 시스템 설정을 관리하세요.</p>
         </div>
-        <Button 
-          onClick={() => setIsAddModalOpen(true)}
-          leftIcon={<UserPlus className="w-4 h-4" />}
-          size="sm"
-          className="bg-indigo-600 hover:bg-indigo-700 shadow-xl shadow-indigo-200/50 border-indigo-500/20"
-        >
-          사용자 추가
-        </Button>
+        <div className="flex gap-3">
+          {userRole === 'owner' ? (
+            <>
+              <Button 
+                onClick={() => {
+                  setNewRole('user');
+                  setIsAddModalOpen(true);
+                }}
+                leftIcon={<UserPlus className="w-4 h-4" />}
+                size="sm"
+                className="bg-indigo-600 hover:bg-indigo-700 shadow-xl shadow-indigo-200/50 border-indigo-500/20"
+              >
+                일반사용자 추가
+              </Button>
+              <Button 
+                onClick={() => {
+                  setNewRole('admin');
+                  setIsAddModalOpen(true);
+                }}
+                leftIcon={<ShieldCheck className="w-4 h-4" />}
+                size="sm"
+                variant="outline"
+                className="border-violet-200 text-violet-700 hover:bg-violet-50 hover:text-violet-800"
+              >
+                관리자 추가
+              </Button>
+            </>
+          ) : (
+            <Button 
+              onClick={() => {
+                setNewRole('user');
+                setIsAddModalOpen(true);
+              }}
+              leftIcon={<UserPlus className="w-4 h-4" />}
+              size="sm"
+              className="bg-indigo-600 hover:bg-indigo-700 shadow-xl shadow-indigo-200/50 border-indigo-500/20"
+            >
+              사용자 추가
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Stats Grid */}
@@ -156,23 +190,26 @@ export default function Admin({ userRole, allowedUsers, drawings, resources, not
                         <td className="py-4 px-4 text-center">
                           <Badge variant="secondary" className={cn(
                             "border-none font-black text-[9px] uppercase tracking-widest px-2 py-0.5",
-                            user.email === 'sunk418@gmail.com' ? "bg-amber-100 text-amber-600" :
+                            OPERATOR_EMAILS.includes(user.email.toLowerCase()) ? "bg-amber-100 text-amber-600" :
                             user.role === 'admin' ? "bg-violet-100 text-violet-600" : "bg-indigo-100 text-indigo-600"
                           )}>
-                            {user.email === 'sunk418@gmail.com' ? '운영자' : 
+                            {OPERATOR_EMAILS.includes(user.email.toLowerCase()) ? '운영자' : 
                              user.role === 'admin' ? '관리자' : '일반사용자'}
                           </Badge>
                         </td>
                         <td className="py-4 px-4 text-right">
-                          {user.email !== 'sunk418@gmail.com' && (
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-9 w-9 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
-                              onClick={() => setDeleteConfirmEmail(user.email)}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                          {!OPERATOR_EMAILS.includes(user.email.toLowerCase()) && (
+                            // Admins can ONLY remove 'user' role, Owners can remove 'admin' and 'user'
+                            (userRole === 'owner' || (userRole === 'admin' && user.role === 'user')) && (
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-9 w-9 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                                onClick={() => setDeleteConfirmEmail(user.email)}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )
                           )}
                         </td>
                       </tr>
@@ -267,11 +304,20 @@ export default function Admin({ userRole, allowedUsers, drawings, resources, not
       <Modal 
         isOpen={isAddModalOpen} 
         onClose={() => setIsAddModalOpen(false)}
-        title="사용자 추가"
+        title={newRole === 'admin' ? "관리자 추가" : "일반사용자 추가"}
         footer={
           <>
             <Button variant="outline" onClick={() => setIsAddModalOpen(false)}>취소</Button>
-            <Button onClick={handleAdd} variant="primary" className="bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200/50">사용자 등록</Button>
+            <Button 
+              onClick={handleAdd} 
+              variant="primary" 
+              className={cn(
+                "shadow-lg",
+                newRole === 'admin' ? "bg-violet-600 hover:bg-violet-700 shadow-violet-200/50" : "bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200/50"
+              )}
+            >
+              {newRole === 'admin' ? '관리자 등록' : '사용자 등록'}
+            </Button>
           </>
         }
       >
@@ -283,35 +329,33 @@ export default function Admin({ userRole, allowedUsers, drawings, resources, not
             onChange={(e) => setNewEmail(e.target.value)}
             leftIcon={<Mail className="w-4 h-4" />}
           />
-          {userRole === 'owner' && (
-            <div className="space-y-3">
-              <label className="text-xs font-black text-slate-500 uppercase tracking-widest ml-1">권한 설정</label>
-              <div className="grid grid-cols-2 gap-4">
-                <button
-                  onClick={() => setNewRole('user')}
-                  className={cn(
-                    "px-6 py-4 rounded-2xl text-sm font-black uppercase tracking-widest border-2 transition-all duration-300",
-                    newRole === 'user' 
-                      ? "bg-indigo-50 border-indigo-600 text-indigo-700 shadow-lg shadow-indigo-100" 
-                      : "bg-white border-slate-100 text-slate-400 hover:bg-slate-50"
-                  )}
-                >
-                  일반사용자
-                </button>
-                <button
-                  onClick={() => setNewRole('admin')}
-                  className={cn(
-                    "px-6 py-4 rounded-2xl text-sm font-black uppercase tracking-widest border-2 transition-all duration-300",
-                    newRole === 'admin' 
-                      ? "bg-violet-50 border-violet-600 text-violet-700 shadow-lg shadow-violet-100" 
-                      : "bg-white border-slate-100 text-slate-400 hover:bg-slate-50"
-                  )}
-                >
-                  관리자
-                </button>
-              </div>
+          <div className={cn(
+            "p-4 rounded-2xl border flex items-start gap-4 transition-all duration-500",
+            newRole === 'admin' ? "bg-violet-50 border-violet-100" : "bg-indigo-50 border-indigo-100"
+          )}>
+            <div className={cn(
+              "w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm",
+              newRole === 'admin' ? "bg-white text-violet-600" : "bg-white text-indigo-600"
+            )}>
+              {newRole === 'admin' ? <ShieldCheck className="w-6 h-6" /> : <Users className="w-6 h-6" />}
             </div>
-          )}
+            <div>
+              <p className={cn(
+                "text-xs font-black uppercase tracking-tight",
+                newRole === 'admin' ? "text-violet-900" : "text-indigo-900"
+              )}>
+                {newRole === 'admin' ? '관리자(Manager) 권한' : '일반사용자(User) 권한'}
+              </p>
+              <p className={cn(
+                "text-[11px] font-medium mt-1 leading-relaxed",
+                newRole === 'admin' ? "text-violet-600" : "text-indigo-600"
+              )}>
+                {newRole === 'admin' 
+                  ? "관리자는 시스템 설정 및 사용자(일반사용자만) 관리가 가능합니다." 
+                  : "일반사용자는 모든 게시판의 내용을 열람하거나 파일을 다운로드할 수 있습니다."}
+              </p>
+            </div>
+          </div>
         </div>
       </Modal>
 

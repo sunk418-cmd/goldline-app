@@ -1,0 +1,5 @@
+{
+  "name": "SafetyDoc PDF - 토목 현장 안전서류 작성",
+  "description": "토목 현장팀을 위한 안전서류 PDF 작성 및 공유 앱. TBM 일지, 음주측정 기록부 등을 간편하게 작성하고 서명하여 공유할 수 있습니다.",
+  "requestFramePermissions": []
+}
