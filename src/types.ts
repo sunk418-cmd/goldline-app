@@ -18,6 +18,13 @@ export interface Notice {
   createdAt: any;
 }
 
+export interface MeetingFile {
+  fileUrl: string;
+  fileName: string;
+  fileType: string;
+  fileSize: number;
+}
+
 export interface Meeting {
   id: string;
   title: string;
@@ -27,6 +34,7 @@ export interface Meeting {
   fileName?: string;
   fileType?: string;
   fileSize?: number;
+  files?: MeetingFile[];
   createdAt: any;
 }
 

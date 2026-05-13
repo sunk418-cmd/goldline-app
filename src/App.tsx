@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { pdfjs } from 'react-pdf';
+
+// Set up the worker for PDF.js - using a CDN is more reliable
+pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import Notices from './pages/Notices';
@@ -50,10 +54,13 @@ export default function App() {
 }
 
 function AppContent() {
+  const location = useLocation();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [isAllowed, setIsAllowed] = useState(false);
+  const [isPermissionLoading, setIsPermissionLoading] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadingMessage, setLoadingMessage] = useState('시스템을 시작하고 있습니다...');
   const { toasts, showToast, removeToast } = useToast();
 
   const [notices, setNotices] = useState<Notice[]>([]);
@@ -79,55 +86,105 @@ function AppContent() {
     checkRedirect();
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setIsPermissionLoading(true);
+      
       if (firebaseUser) {
-        // 1. Check if user is an operator using centralized list
+        setLoadingMessage('로그인 정보를 확인 중입니다...');
+        
         const userEmail = (firebaseUser.email || '').toLowerCase();
         const isOperator = OPERATOR_EMAILS.includes(userEmail);
-        const role: UserRole = isOperator ? 'owner' : 'user';
         
-        setUser({
+        // 1. Create base profile
+        const baseProfile: UserProfile = {
           uid: firebaseUser.uid,
           email: userEmail,
           displayName: firebaseUser.displayName || '사용자',
-          role: role,
+          role: isOperator ? 'owner' : 'user',
           createdAt: new Date()
-        });
+        };
+        setUser(baseProfile);
 
-        // 2. Initial check: operator is always allowed
-        if (isOperator) {
-          setIsAllowed(true);
-        } else {
-          // If not owner, check Firestore whitelist immediately
-          try {
+        // 2. Sequential Permission Check
+        setLoadingMessage(`${userEmail} 계정의 권한을 확인하고 있습니다...`);
+        
+        try {
+          if (isOperator) {
+            setIsAllowed(true);
+            setLoadingMessage('운영자 권한으로 접속합니다...');
+          } else {
+            // Force server check for permission - strictly sequential
             const userDoc = await getDocFromServer(doc(db, 'allowedUsers', userEmail));
+            
             if (userDoc.exists()) {
-              setIsAllowed(true);
               const data = userDoc.data() as AllowedUser;
-              const isOperator = OPERATOR_EMAILS.includes(userEmail);
-              const finalRole = isOperator ? 'owner' : data.role;
-              setUser(prev => prev ? {...prev, role: finalRole} : prev);
+              setIsAllowed(true);
+              setUser({ ...baseProfile, role: data.role });
+              setLoadingMessage('권한 확인이 완료되었습니다. 데이터를 불러옵니다...');
             } else {
               setIsAllowed(false);
             }
-          } catch (e) {
-            console.error("Whitelist check error:", e);
-            setIsAllowed(false);
           }
+        } catch (e) {
+          console.error("Whitelist check error:", e);
+          setIsAllowed(false);
+          showToast('error', '권한 확인 중 오류가 발생했습니다.');
         }
       } else {
         setUser(null);
         setIsAllowed(false);
       }
+      
       setIsAuthReady(true);
+      setIsPermissionLoading(false);
       setIsLoading(false);
     });
 
     return () => unsubscribe();
   }, []);
 
-  // Real-time listeners
+  // 1. Real-time Permission Listener (Keeps role and access in sync)
   useEffect(() => {
-    if (!user || !isAllowed) return;
+    if (!user || !isAuthReady) return;
+
+    const unsubAllowed = onSnapshot(collection(db, 'allowedUsers'), (snapshot) => {
+      const users = snapshot.docs.map(doc => doc.data() as AllowedUser);
+      setAllowedUsers(users);
+      
+      const userEmail = user.email.toLowerCase();
+      const isInWhitelist = users.some(u => u.email.toLowerCase() === userEmail);
+      const isOperator = OPERATOR_EMAILS.includes(userEmail);
+      
+      if (isOperator || isInWhitelist) {
+        setIsAllowed(true);
+        if (isInWhitelist) {
+          const whiteListUser = users.find(u => u.email.toLowerCase() === userEmail);
+          if (whiteListUser) {
+            const finalRole = isOperator ? 'owner' : whiteListUser.role;
+            if (user.role !== finalRole) {
+              setUser(prev => prev ? {...prev, role: finalRole} : prev);
+            }
+          }
+        }
+      } else {
+        setIsAllowed(false);
+      }
+    }, (error) => {
+      console.warn("Permission listener error:", error);
+    });
+
+    return () => unsubAllowed();
+  }, [user?.email, isAuthReady]);
+
+  // 2. Real-time Data Listeners (Only runs when allowed)
+  useEffect(() => {
+    if (!user || !isAllowed) {
+      // Clear data when access is lost
+      setNotices([]);
+      setMeetings([]);
+      setDrawings([]);
+      setResources([]);
+      return;
+    }
 
     const unsubNotices = onSnapshot(query(collection(db, 'notices'), orderBy('createdAt', 'desc')), (snapshot) => {
       setNotices(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Notice)));
@@ -157,40 +214,11 @@ function AppContent() {
       handleFirestoreError(error, OperationType.GET, 'resources');
     });
 
-    const unsubAllowed = onSnapshot(collection(db, 'allowedUsers'), (snapshot) => {
-      const users = snapshot.docs.map(doc => doc.data() as AllowedUser);
-      setAllowedUsers(users);
-      
-      // Real-time permission check
-      if (user) {
-        const userEmail = user.email.toLowerCase();
-        const isInWhitelist = users.some(u => u.email.toLowerCase() === userEmail);
-        const isOperator = OPERATOR_EMAILS.includes(userEmail);
-        
-        if (isOperator || isInWhitelist) {
-          setIsAllowed(true);
-          // If in whitelist, update role accordingly
-          if (isInWhitelist) {
-            const whiteListUser = users.find(u => u.email.toLowerCase() === userEmail);
-            if (whiteListUser) {
-              const finalRole = isOperator ? 'owner' : whiteListUser.role;
-              setUser(prev => prev ? {...prev, role: finalRole} : prev);
-            }
-          }
-        } else {
-          setIsAllowed(false);
-        }
-      }
-    }, (error) => {
-      handleFirestoreError(error, OperationType.GET, 'allowedUsers');
-    });
-
     return () => {
       unsubNotices();
       unsubMeetings();
       unsubDrawings();
       unsubResources();
-      unsubAllowed();
     };
   }, [user, isAllowed]);
 
@@ -242,10 +270,24 @@ function AppContent() {
     }
   };
 
-  if (!isAuthReady) {
+  if (!isAuthReady || (user && isPermissionLoading)) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 gap-6">
+        <div className="relative">
+          <div className="w-16 h-16 border-4 border-violet-100 border-t-violet-600 rounded-full animate-spin"></div>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-8 h-8 bg-white rounded-full shadow-sm"></div>
+          </div>
+        </div>
+        <div className="flex flex-col items-center gap-2 max-w-xs text-center">
+          <p className="text-sm font-black text-slate-900 tracking-tighter uppercase">{loadingMessage}</p>
+          <div className="flex items-center gap-1">
+            <span className="w-1 h-1 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+            <span className="w-1 h-1 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+            <span className="w-1 h-1 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+          </div>
+          <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase tracking-widest opacity-60">System Security Verification</p>
+        </div>
       </div>
     );
   }
@@ -269,10 +311,10 @@ function AppContent() {
   }
 
   return (
-    <Router>
+    <div className="min-h-screen bg-slate-50">
       <Layout user={user} onLogout={handleLogout}>
-        <Routes>
-          <Route path={ROUTES.DASHBOARD} element={<Dashboard notices={notices} meetings={meetings} drawings={drawings} resources={resources} isLoading={isLoading} />} />
+        <Routes key={location.pathname}>
+          <Route index element={<Dashboard notices={notices} meetings={meetings} drawings={drawings} resources={resources} isLoading={isLoading} />} />
           <Route path={ROUTES.NOTICES} element={<Notices notices={notices} role={user.role} onCreate={async (n) => { try { await addDoc(collection(db, 'notices'), { ...n, createdAt: serverTimestamp() }); showToast('success', '공지가 등록되었습니다.'); } catch (e) { handleFirestoreError(e, OperationType.CREATE, 'notices'); } }} onUpdate={async () => {}} onDelete={async (id) => { try { await deleteDoc(doc(db, 'notices', id)); showToast('success', '공지가 삭제되었습니다.'); } catch (e) { handleFirestoreError(e, OperationType.DELETE, `notices/${id}`); } }} isLoading={isLoading} />} />
           <Route path={ROUTES.MEETINGS} element={<Meetings meetings={meetings} role={user.role} onCreate={async (m) => { try { await addDoc(collection(db, 'meetings'), { ...m, createdAt: serverTimestamp() }); showToast('success', '회의록이 등록되었습니다.'); } catch (e) { handleFirestoreError(e, OperationType.CREATE, 'meetings'); } }} onUpdate={async () => {}} onDelete={async (id) => { try { await deleteDoc(doc(db, 'meetings', id)); showToast('success', '회의록이 삭제되었습니다.'); } catch (e) { handleFirestoreError(e, OperationType.DELETE, `meetings/${id}`); } }} isLoading={isLoading} />} />
           <Route path={ROUTES.DRAWINGS} element={<Drawings drawings={drawings} role={user.role} onDelete={async (id) => { try { await deleteDoc(doc(db, 'drawings', id)); showToast('success', '도면이 삭제되었습니다.'); } catch (e) { handleFirestoreError(e, OperationType.DELETE, `drawings/${id}`); } }} isLoading={isLoading} showToast={showToast} />} />
@@ -284,6 +326,6 @@ function AppContent() {
         </Routes>
       </Layout>
       <ToastContainer toasts={toasts} onClose={removeToast} />
-    </Router>
+    </div>
   );
 }

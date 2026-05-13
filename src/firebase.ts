@@ -22,25 +22,23 @@ import {
 import { getStorage, ref, uploadBytes, getDownloadURL, uploadBytesResumable, getBlob } from 'firebase/storage';
 
 // Firebase configuration from environment variables
-// Firebase configuration - Using hardcoded values for absolute reliability
+// Firebase configuration - Hardcoded for absolute reliability across all devices
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  firestoreDatabaseId: import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID
+  apiKey: "AIzaSyB_z4K-XS5qEXyqxQ5nEeeT715rERTvnOg",
+  authDomain: "ai-studio-applet-webapp-de8ea.web.app",
+  projectId: "ai-studio-applet-webapp-de8ea",
+  storageBucket: "ai-studio-applet-webapp-de8ea.firebasestorage.app",
+  messagingSenderId: "794412096508",
+  appId: "1:794412096508:web:045e71dfbba16481073079",
+  firestoreDatabaseId: "ai-studio-48ffc81f-ab8d-485c-832c-1e4b4af66d00"
 };
 
 // Initialize Firebase SDK
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
-// Initialize Firestore - default to (default) if no ID is provided
-export const db = (firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== "(default)") 
-  ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
-  : getFirestore(app);
+// Initialize Firestore - Force connection to the specific database instance
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 
 // Initialize Storage - ensure storageBucket is used correctly
 export const storage = getStorage(app, firebaseConfig.storageBucket || undefined);

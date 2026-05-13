@@ -21,7 +21,8 @@ import {
   RotateCcw,
   FileText,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  ExternalLink
 } from 'lucide-react';
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import { Document, Page } from 'react-pdf';
@@ -343,11 +344,27 @@ export default function Drawings({ drawings, role, onDelete, isLoading, showToas
                   referrerPolicy="no-referrer"
                 />
               )}
-              <div className="absolute inset-0 bg-violet-900/0 group-hover:bg-violet-900/20 transition-colors duration-500 flex items-center justify-center opacity-0 group-hover:opacity-100">
-                <div className="w-12 h-12 rounded-full bg-white/90 backdrop-blur-md flex items-center justify-center text-violet-600 shadow-2xl transform scale-50 group-hover:scale-100 transition-all duration-500">
-                  <Maximize2 className="w-5 h-5" />
+              
+              {/* Hover Overlay with Action Buttons */}
+              <div className="absolute inset-0 bg-slate-900/0 group-hover:bg-slate-900/40 transition-all duration-500 flex items-center justify-center gap-3 opacity-0 group-hover:opacity-100 backdrop-blur-[2px]">
+                <div 
+                  className="w-12 h-12 rounded-2xl bg-white text-violet-600 shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all transform -translate-y-4 group-hover:translate-y-0 duration-500"
+                  title="미리보기"
+                >
+                  <Eye className="w-5 h-5" />
                 </div>
+                <a 
+                  href={drawing.imageUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-12 h-12 rounded-2xl bg-violet-600 text-white shadow-2xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all transform translate-y-4 group-hover:translate-y-0 duration-500 delay-75"
+                  title="새 창에서 원본 보기"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Maximize2 className="w-5 h-5" />
+                </a>
               </div>
+
               <div className="absolute top-3 left-3">
                 <Badge variant="secondary" className="bg-white/90 backdrop-blur-md border-none shadow-sm text-violet-600 font-black text-[8px] uppercase tracking-widest px-2 py-0.5">
                   {drawing.category}
@@ -360,9 +377,21 @@ export default function Drawings({ drawings, role, onDelete, isLoading, showToas
               <div className="absolute top-0 left-4 right-4 h-px bg-slate-100" />
               
               <div>
-                <h3 className="text-sm font-black text-slate-900 line-clamp-1 group-hover:text-violet-600 transition-colors tracking-tight">
-                  {drawing.title}
-                </h3>
+                <div className="flex items-start justify-between gap-2">
+                  <h3 className="text-sm font-black text-slate-900 line-clamp-1 group-hover:text-violet-600 transition-colors tracking-tight">
+                    {drawing.title}
+                  </h3>
+                  <a 
+                    href={drawing.imageUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-1 text-slate-400 hover:text-violet-600 transition-colors"
+                    onClick={(e) => e.stopPropagation()}
+                    title="새 창에서 보기"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                </div>
                 <div className="flex items-center gap-2 mt-2 text-[9px] font-black text-slate-400 uppercase tracking-widest">
                   <Calendar className="w-3 h-3 text-violet-500" />
                   <span>{drawing.createdAt ? format(drawing.createdAt.toDate ? drawing.createdAt.toDate() : new Date(drawing.createdAt), 'yyyy.MM.dd', { locale: ko }) : '-'}</span>
@@ -549,15 +578,15 @@ export default function Drawings({ drawings, role, onDelete, isLoading, showToas
                 </div>
               </div>
               
-              <Button 
-                variant="primary" 
-                size="md" 
-                leftIcon={<Maximize2 className="w-4 h-4" />}
-                className="w-full md:w-auto bg-violet-600 hover:bg-violet-700 shadow-xl shadow-violet-200/50 py-4 md:py-3 px-8 whitespace-nowrap text-[10px] uppercase tracking-widest font-black"
-                onClick={handleOpenOriginal}
+              <a 
+                href={selectedDrawing.imageUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full md:w-auto bg-violet-600 hover:bg-violet-700 text-white shadow-xl shadow-violet-200/50 py-4 md:py-3 px-8 whitespace-nowrap text-[10px] uppercase tracking-widest font-black rounded-xl inline-flex items-center justify-center gap-2 transition-all active:scale-[0.97]"
               >
+                <Maximize2 className="w-4 h-4" />
                 도면 크게 보기
-              </Button>
+              </a>
             </div>
             
             <div className="flex-1 bg-slate-900 rounded-[40px] overflow-hidden relative group flex flex-col items-center justify-center shadow-2xl">

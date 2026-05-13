@@ -111,7 +111,8 @@ export async function generateMergedDocx(templates: DocTemplate[], data: Record<
       saveAs(blob, `${portraitFiles[0].name}_${new Date().toISOString().split('T')[0]}.docx`);
     } else {
       const docxMerger = new DocxMerger({}, portraitFiles.map(f => f.data));
-      docxMerger.save('blob', function(blob: Blob) {
+      docxMerger.save('blob', function(generatedBlob: Blob) {
+        const blob = new Blob([generatedBlob], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
         saveAs(blob, `안전서류_병합본_${new Date().toISOString().split('T')[0]}.docx`);
       });
     }

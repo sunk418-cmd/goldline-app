@@ -1,81 +1,114 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { FileText, Loader2 } from 'lucide-react';
-import { Document, Page, pdfjs } from 'react-pdf';
+import * as pdfjs from 'pdfjs-dist';
 
-// Set up the worker for PDF.js - using a CDN is more reliable across environments
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+// pdfjs worker is already set up in App.tsx
 
 interface PdfPreviewProps {
   imageUrl: string;
 }
 
+/**
+ * Intelligent PDF Thumbnail Component
+ * Renders the actual first page of the PDF into an image only when visible.
+ * This provides the preview users want without the memory overhead of a full PDF viewer.
+ */
 export default function PdfPreview({ imageUrl }: PdfPreviewProps) {
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [error, setError] = useState<boolean>(false);
-  const [useFallback, setUseFallback] = useState<boolean>(false);
+  const [thumbnail, setThumbnail] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const renderStarted = useRef(false);
 
-  function onDocumentLoadSuccess() {
-    setIsLoaded(true);
-    setUseFallback(false);
-  }
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !renderStarted.current && !thumbnail) {
+          renderStarted.current = true;
+          renderThumbnail();
+        }
+      },
+      { threshold: 0.1 }
+    );
 
-  function onDocumentLoadError(err: Error) {
-    console.error('PDF Load Error:', err);
-    setError(true);
-    setIsLoaded(true);
-    // If react-pdf fails (likely CORS), fallback to iframe for desktop
-    setUseFallback(true);
-  }
+    if (containerRef.current) {
+      observer.observe(containerRef.current);
+    }
 
-  // Fallback UI for when react-pdf fails (e.g., CORS issues)
-  if (useFallback) {
+    return () => observer.disconnect();
+  }, [imageUrl, thumbnail]);
+
+  const renderThumbnail = async () => {
+    try {
+      setLoading(true);
+      // Load the PDF document
+      const loadingTask = pdfjs.getDocument(imageUrl);
+      const pdf = await loadingTask.promise;
+      
+      // Get the first page
+      const page = await pdf.getPage(1);
+      
+      // Setup scale and viewport
+      const viewport = page.getViewport({ scale: 0.5 }); // Lower scale for thumbnail
+      
+      // Create canvas to render
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
+
+      if (!context) throw new Error('Canvas context failed');
+
+      // Render page to canvas
+      await page.render({
+        canvasContext: context,
+        viewport: viewport
+      }).promise;
+
+      // Convert canvas to data URL (image)
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+      setThumbnail(dataUrl);
+      
+      // Clean up PDF resources immediately
+      await pdf.destroy();
+    } catch (err) {
+      console.error('Thumbnail generation failed:', err);
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (error) {
     return (
-      <div className="relative w-full h-full overflow-hidden bg-white flex items-center justify-center">
-        <iframe
-          src={`${imageUrl}#page=1&view=FitH&toolbar=0&navpanes=0&scrollbar=0&statusbar=0&messages=0`}
-          className="absolute inset-0 border-none w-full h-full pointer-events-none"
-          onLoad={() => setIsLoaded(true)}
-          title="PDF Thumbnail Fallback"
-        />
-        {!isLoaded && (
-          <div className="absolute inset-0 flex items-center justify-center bg-slate-50 z-0">
-            <Loader2 className="w-6 h-6 text-violet-500 animate-spin" />
-          </div>
-        )}
-        <div className="absolute inset-0 z-10 bg-transparent" />
+      <div className="w-full h-full bg-slate-100 flex flex-col items-center justify-center p-4">
+        <FileText className="w-8 h-8 text-slate-300 mb-2" />
+        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Preview Failed</span>
       </div>
     );
   }
 
   return (
-    <div className="relative w-full h-full overflow-hidden bg-white flex items-center justify-center">
-      <div 
-        className={`transition-opacity duration-500 w-full h-full flex items-center justify-center ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
-      >
-        <Document
-          file={imageUrl}
-          onLoadSuccess={onDocumentLoadSuccess}
-          onLoadError={onDocumentLoadError}
-          loading={null}
-          className="flex items-center justify-center w-full h-full overflow-hidden"
-        >
-          <Page 
-            pageNumber={1} 
-            renderTextLayer={false} 
-            renderAnnotationLayer={false}
-            className="max-w-full max-h-full"
-            width={300}
-          />
-        </Document>
-      </div>
-      
-      {!isLoaded && (
-        <div className="absolute inset-0 flex items-center justify-center bg-slate-50 z-0">
-          <Loader2 className="w-6 h-6 text-violet-500 animate-spin" />
+    <div ref={containerRef} className="relative w-full h-full bg-white overflow-hidden flex items-center justify-center">
+      {thumbnail ? (
+        <img 
+          src={thumbnail} 
+          alt="PDF Preview" 
+          className="w-full h-full object-cover transition-opacity duration-500 opacity-100 animate-in fade-in" 
+        />
+      ) : (
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-6 h-6 text-violet-500 animate-spin opacity-50" />
+          <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Generating...</span>
         </div>
       )}
-
-      <div className="absolute inset-0 z-10 bg-transparent" />
+      
+      {/* Visual Indicator that it's a PDF */}
+      <div className="absolute top-2 right-2 z-10">
+        <div className="bg-rose-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded shadow-lg uppercase tracking-widest ring-1 ring-white/20">
+          PDF
+        </div>
+      </div>
     </div>
   );
 }

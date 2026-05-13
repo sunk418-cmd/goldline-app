@@ -55,8 +55,11 @@ export default function Meetings({ meetings, role, onCreate, onUpdate, onDelete,
   const [selectedYear, setSelectedYear] = useState<string>('all'); // yyyy format
   const [selectedMonth, setSelectedMonth] = useState<string>('all'); // yyyy-MM format
   const [isUploading, setIsUploading] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+  const [lightboxFiles, setLightboxFiles] = useState<any[]>([]); // MeetingFile or legacy
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [newMeeting, setNewMeeting] = useState({
@@ -97,60 +100,81 @@ export default function Meetings({ meetings, role, onCreate, onUpdate, onDelete,
         .sort((a, b) => b.localeCompare(a));
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] || null;
-    setSelectedFile(file);
+    const files = Array.from(e.target.files || []);
+    const newFiles = [...selectedFiles, ...files].slice(0, 5); // Max 5
+    setSelectedFiles(newFiles);
     
-    if (file) {
+    const urls = newFiles.map(file => {
       if (file.type.startsWith('image/')) {
-        // Use createObjectURL instead of FileReader for better performance on mobile
-        const url = URL.createObjectURL(file);
-        setPreviewUrl(url);
-      } else {
-        setPreviewUrl(null);
+        return URL.createObjectURL(file);
       }
-    } else {
-      setPreviewUrl(null);
-    }
+      return '';
+    });
+    setPreviewUrls(urls);
   };
 
-  // Clean up object URLs to prevent memory leaks
+  const removeFile = (index: number) => {
+    const newFiles = [...selectedFiles];
+    newFiles.splice(index, 1);
+    setSelectedFiles(newFiles);
+    
+    const newUrls = [...previewUrls];
+    if (newUrls[index] && newUrls[index].startsWith('blob:')) {
+      URL.revokeObjectURL(newUrls[index]);
+    }
+    newUrls.splice(index, 1);
+    setPreviewUrls(newUrls);
+  };
+
   useEffect(() => {
     return () => {
-      if (previewUrl && previewUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(previewUrl);
-      }
+      previewUrls.forEach(url => {
+        if (url && url.startsWith('blob:')) {
+          URL.revokeObjectURL(url);
+        }
+      });
     };
-  }, [previewUrl]);
+  }, [previewUrls]);
 
   const handleCreate = async () => {
     if (!newMeeting.title || !newMeeting.content) return;
     
     setIsUploading(true);
     try {
-      let fileData = {};
+      let fileData: any = {};
+      const uploadedFiles = [];
       
-      if (selectedFile) {
-        const fileRef = ref(storage, `meetings/${Date.now()}_${selectedFile.name}`);
-        // Set content type to ensure browser handles it correctly
-        const metadata = {
-          contentType: selectedFile.type,
-        };
-        
-        // Use Promise.race to implement a timeout for the upload
-        const uploadPromise = uploadBytes(fileRef, selectedFile, metadata);
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('UPLOAD_TIMEOUT')), 45000) // 45s timeout
-        );
+      if (selectedFiles.length > 0) {
+        for (let i = 0; i < selectedFiles.length; i++) {
+          const file = selectedFiles[i];
+          const fileRef = ref(storage, `meetings/${Date.now()}_${i}_${file.name}`);
+          const metadata = { contentType: file.type };
+          
+          const uploadPromise = uploadBytes(fileRef, file, metadata);
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('UPLOAD_TIMEOUT')), 45000)
+          );
 
-        await Promise.race([uploadPromise, timeoutPromise]);
+          await Promise.race([uploadPromise, timeoutPromise]);
+          const fileUrl = await getDownloadURL(fileRef);
+          
+          uploadedFiles.push({
+            fileUrl,
+            fileName: file.name,
+            fileType: file.type,
+            fileSize: file.size
+          });
+        }
         
-        const fileUrl = await getDownloadURL(fileRef);
-        fileData = {
-          fileUrl,
-          fileName: selectedFile.name,
-          fileType: selectedFile.type,
-          fileSize: selectedFile.size
-        };
+        if (uploadedFiles.length > 0) {
+          fileData = {
+            fileUrl: uploadedFiles[0].fileUrl,
+            fileName: uploadedFiles[0].fileName,
+            fileType: uploadedFiles[0].fileType,
+            fileSize: uploadedFiles[0].fileSize,
+            files: uploadedFiles
+          };
+        }
       }
 
       await onCreate({
@@ -161,8 +185,8 @@ export default function Meetings({ meetings, role, onCreate, onUpdate, onDelete,
       // Success: Close and Reset
       setIsCreateModalOpen(false);
       setNewMeeting({ title: '', date: format(new Date(), 'yyyy-MM-dd'), content: '' });
-      setSelectedFile(null);
-      setPreviewUrl(null);
+      setSelectedFiles([]);
+      setPreviewUrls([]);
     } catch (error: any) {
       console.error("Error creating meeting:", error);
       // Even on error, we might want to close the modal if the upload actually happened
@@ -456,68 +480,73 @@ export default function Meetings({ meetings, role, onCreate, onUpdate, onDelete,
           </div>
 
           <div className="space-y-3">
-            <label className="text-xs font-black text-slate-500 uppercase tracking-widest ml-1">첨부 파일 (이미지 또는 PDF)</label>
-            <div 
-              onClick={() => !isUploading && fileInputRef.current?.click()}
-              className={cn(
-                "relative overflow-hidden border-2 border-dashed rounded-[32px] transition-all cursor-pointer group",
-                (previewUrl || (selectedFile && selectedFile.type === 'application/pdf')) ? "aspect-video border-emerald-200 bg-slate-50" : "p-16 border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/30",
-                isUploading && "opacity-50 cursor-not-allowed"
-              )}
-            >
-              {(previewUrl || (selectedFile && selectedFile.type === 'application/pdf')) ? (
-                <>
-                  {selectedFile?.type === 'application/pdf' ? (
-                    <div className="w-full h-full flex flex-col items-center justify-center">
-                      <div className="w-20 h-20 rounded-3xl bg-white shadow-xl flex items-center justify-center text-emerald-600 mb-4">
-                        <FileText className="w-10 h-10" />
+            <div className="flex justify-between items-center ml-1">
+              <label className="text-xs font-black text-slate-500 uppercase tracking-widest">첨부 파일 (이미지 또는 PDF)</label>
+              <span className="text-xs font-bold text-slate-400">{selectedFiles.length} / 5</span>
+            </div>
+            {selectedFiles.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-4">
+                {selectedFiles.map((file, index) => (
+                  <div key={index} className="relative aspect-square rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 group">
+                    {previewUrls[index] ? (
+                      <img src={previewUrls[index]} alt="Preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center">
+                        <FileText className="w-8 h-8 text-emerald-500 mb-2" />
+                        <span className="text-[10px] font-black text-slate-600 truncate px-2 w-full text-center">{file.name}</span>
                       </div>
-                      <span className="text-sm font-black text-slate-700 tracking-tight">{selectedFile?.name || 'PDF 파일'}</span>
-                      <Badge variant="secondary" className="mt-2 bg-emerald-100 text-emerald-600 border-none px-3 py-1 text-[10px] font-black uppercase tracking-widest">PDF Document</Badge>
-                    </div>
-                  ) : (
-                    <img src={previewUrl!} alt="Preview" className="w-full h-full object-contain p-4" />
-                  )}
-                  <div className="absolute inset-0 bg-emerald-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
-                    <div className="flex flex-col items-center text-white">
-                      <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center mb-3">
-                        <Upload className="w-6 h-6" />
-                      </div>
-                      <span className="text-xs font-black uppercase tracking-widest">파일 변경하기</span>
-                    </div>
+                    )}
+                    {!isUploading && (
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeFile(index);
+                        }}
+                        className="absolute top-2 right-2 p-1.5 bg-rose-500 hover:bg-rose-600 text-white rounded-lg shadow-sm transition-all opacity-0 group-hover:opacity-100 z-10"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    )}
                   </div>
-                  {!isUploading && (
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedFile(null);
-                        setPreviewUrl(null);
-                        if (fileInputRef.current) fileInputRef.current.value = '';
-                      }}
-                      className="absolute top-4 right-4 p-2 bg-white/80 hover:bg-white text-rose-500 rounded-xl shadow-sm border border-rose-100 transition-all z-10"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
-                </>
-              ) : (
+                ))}
+                {selectedFiles.length < 5 && !isUploading && (
+                  <div 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="relative aspect-square rounded-2xl border-2 border-dashed border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50 flex flex-col items-center justify-center cursor-pointer transition-all group"
+                  >
+                    <Plus className="w-8 h-8 text-slate-400 group-hover:text-emerald-500 mb-2 transition-colors" />
+                    <span className="text-xs font-bold text-slate-500 group-hover:text-emerald-600">추가하기</span>
+                  </div>
+                )}
+              </div>
+            )}
+            {selectedFiles.length === 0 && (
+              <div 
+                onClick={() => !isUploading && fileInputRef.current?.click()}
+                className={cn(
+                  "relative overflow-hidden border-2 border-dashed rounded-[32px] transition-all cursor-pointer group p-16 border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/30",
+                  isUploading && "opacity-50 cursor-not-allowed"
+                )}
+              >
                 <div className="flex flex-col items-center text-center space-y-4">
                   <div className="w-20 h-20 rounded-[28px] bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-emerald-100 group-hover:text-emerald-600 transition-all duration-500 shadow-inner">
                     <Upload className="w-8 h-8" />
                   </div>
                   <div className="space-y-1">
-                    <p className="text-base font-black text-slate-900 tracking-tight">클릭하여 파일 업로드</p>
-                    <p className="text-xs font-medium text-slate-400">이미지 또는 PDF 파일을 선택해 주세요 (최대 20MB)</p>
+                    <p className="text-base font-black text-slate-900 tracking-tight">클릭하여 파일 업로드 (최대 5개)</p>
+                    <p className="text-xs font-medium text-slate-400">이미지 또는 PDF 파일을 선택해 주세요</p>
                   </div>
                 </div>
-              )}
-              <input 
-                type="file" 
-                ref={fileInputRef}
-                className="hidden" 
-                onChange={handleFileChange}
-              />
-            </div>
+              </div>
+            )}
+            <input 
+              type="file" 
+              ref={fileInputRef}
+              className="hidden" 
+              multiple
+              accept="image/*,.pdf"
+              onChange={handleFileChange}
+            />
           </div>
         </div>
       </Modal>
@@ -555,29 +584,34 @@ export default function Meetings({ meetings, role, onCreate, onUpdate, onDelete,
                 </div>
               </div>
 
-              {selectedMeeting.fileUrl && (
-                <div className="pt-6 border-t border-slate-200/60">
-                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 bg-white rounded-2xl border border-slate-100 shadow-sm">
-                    <div className="flex items-center gap-4 w-full sm:w-auto">
-                      <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 flex-shrink-0">
-                        <Paperclip className="w-5 h-5" />
+              {(selectedMeeting.files?.length ? selectedMeeting.files.length > 0 : !!selectedMeeting.fileUrl) && (
+                <div className="pt-6 border-t border-slate-200/60 space-y-3">
+                  <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">첨부 파일 ({selectedMeeting.files?.length || 1})</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {(selectedMeeting.files || [{
+                      fileUrl: selectedMeeting.fileUrl!,
+                      fileName: selectedMeeting.fileName || '첨부파일',
+                      fileType: selectedMeeting.fileType || '',
+                      fileSize: selectedMeeting.fileSize || 0
+                    }]).map((file, idx, arr) => (
+                      <div key={idx} className="flex items-center justify-between p-3 bg-white rounded-xl border border-slate-100 shadow-sm hover:border-emerald-200 hover:shadow-md transition-all group cursor-pointer" onClick={() => {
+                        setLightboxFiles(arr);
+                        setLightboxIndex(idx);
+                        setLightboxOpen(true);
+                      }}>
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600 flex-shrink-0 group-hover:scale-110 transition-transform">
+                            <Paperclip className="w-4 h-4" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold text-slate-700 truncate group-hover:text-emerald-600 transition-colors">
+                              {file.fileName}
+                            </p>
+                            <p className="text-[9px] text-slate-400">{file.fileType?.includes('pdf') || file.fileName?.toLowerCase().endsWith('.pdf') ? 'PDF' : 'IMAGE'}</p>
+                          </div>
+                        </div>
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mb-0.5">첨부 파일</p>
-                        <p className="text-xs font-bold text-slate-900 truncate max-w-[180px] sm:max-w-[250px]">
-                          {selectedMeeting.fileName || '첨부파일'}
-                        </p>
-                      </div>
-                    </div>
-                    <Button 
-                      onClick={() => handleViewFile(selectedMeeting.fileUrl!, selectedMeeting.fileName || 'file')}
-                      variant="outline"
-                      size="sm"
-                      leftIcon={<Maximize2 className="w-4 h-4" />}
-                      className="w-full sm:w-auto bg-white border-slate-200 text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 text-[11px] font-black"
-                    >
-                      원본 크게 보기
-                    </Button>
+                    ))}
                   </div>
                 </div>
               )}
@@ -601,6 +635,69 @@ export default function Meetings({ meetings, role, onCreate, onUpdate, onDelete,
           </div>
         )}
       </Modal>
+
+      {/* Lightbox Modal */}
+      {lightboxOpen && lightboxFiles.length > 0 && (
+        <div className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-xl flex flex-col animate-in fade-in duration-300">
+          <div className="flex items-center justify-between p-4 md:p-6 absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/60 to-transparent">
+            <div className="text-white">
+              <p className="font-bold text-sm md:text-base">{lightboxFiles[lightboxIndex].fileName}</p>
+              <p className="text-xs text-white/50">{lightboxIndex + 1} / {lightboxFiles.length}</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <a 
+                href={lightboxFiles[lightboxIndex].fileUrl} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors"
+                title="새 탭에서 열기"
+              >
+                <Maximize2 className="w-4 h-4" />
+              </a>
+              <button 
+                onClick={() => setLightboxOpen(false)}
+                className="w-10 h-10 rounded-full bg-white/10 hover:bg-rose-500/80 flex items-center justify-center text-white transition-colors"
+              >
+                <Plus className="w-5 h-5 rotate-45" />
+              </button>
+            </div>
+          </div>
+          
+          <div className="flex-1 flex items-center justify-center relative w-full h-full p-4 md:p-12 mt-16 md:mt-0">
+            <button 
+              className="absolute left-2 md:left-8 w-12 h-12 rounded-full bg-white/10 hover:bg-emerald-600 text-white flex items-center justify-center backdrop-blur-md transition-all disabled:opacity-30 disabled:hover:bg-white/10 z-10"
+              onClick={() => setLightboxIndex(i => Math.max(0, i - 1))}
+              disabled={lightboxIndex === 0}
+            >
+              <ChevronLeft className="w-6 h-6" />
+            </button>
+            
+            <div className="w-full h-full flex items-center justify-center max-w-5xl mx-auto overflow-hidden rounded-2xl">
+              {lightboxFiles[lightboxIndex].fileType?.includes('pdf') || lightboxFiles[lightboxIndex].fileName?.toLowerCase().endsWith('.pdf') ? (
+                <iframe 
+                  src={`https://docs.google.com/viewer?url=${encodeURIComponent(lightboxFiles[lightboxIndex].fileUrl)}&embedded=true`}
+                  className="w-full h-full bg-white rounded-xl shadow-2xl"
+                  title={lightboxFiles[lightboxIndex].fileName}
+                />
+              ) : (
+                <img 
+                  src={lightboxFiles[lightboxIndex].fileUrl} 
+                  alt={lightboxFiles[lightboxIndex].fileName} 
+                  className="max-w-full max-h-full object-contain rounded-xl shadow-2xl" 
+                />
+              )}
+            </div>
+
+            <button 
+              className="absolute right-2 md:right-8 w-12 h-12 rounded-full bg-white/10 hover:bg-emerald-600 text-white flex items-center justify-center backdrop-blur-md transition-all disabled:opacity-30 disabled:hover:bg-white/10 z-10"
+              onClick={() => setLightboxIndex(i => Math.min(lightboxFiles.length - 1, i + 1))}
+              disabled={lightboxIndex === lightboxFiles.length - 1}
+            >
+              <ChevronRight className="w-6 h-6" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Modal */}
       <Modal
