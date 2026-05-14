@@ -1,6 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 
-const MODEL_NAME = "gemini-3-flash-preview";
+const MODEL_NAME = "gemini-flash-latest";
 
 export async function askGemini(question: string, context: string | { trackMaintenanceReg: string, maintenanceGuide: string, trackInspectionReg: string }) {
   // Use VITE_GEMINI_API_KEY from environment variables for security
